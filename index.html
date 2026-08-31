@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+  <!-- 在 <head> 內引入 manifest.json -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0c1626">
+
+<!-- 在 </head> 之前加入 Service Worker 註冊腳本 -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CPBL 即時逐打席 · 進壘點</title>

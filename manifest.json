@@ -1,0 +1,16 @@
+{
+  "name": "CPBL 即時逐打席與進壘點",
+  "short_name": "CPBL進壘點",
+  "description": "CPBL 中華職棒即時逐打席與進壘點追蹤工具",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070d16",
+  "theme_color": "#0c1626",
+  "icons": [
+    {
+      "src": "https://stats.cpbl.com.tw/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

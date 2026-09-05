@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPBL 即時逐打席 · 進壘點</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070d16;
+    --frame:#0c1626;
+    --surface:#101f34;
+    --surface-2:#182c48;
+    --line:#25395a;
+    --text:#eef3f9;
+    --text-dim:#8ea0bb;
+    --text-faint:#5c7093;
+    --red:#e0263f;
+    --red-dim:#5a1420;
+    --gold:#f4b73a;
+    --gold-dim:#4a3a13;
+    --green:#33c98a;
+    --green-dim:#123829;
+    --blue:#4f8ff0;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #16294a 0%, var(--bg) 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Noto Sans TC', sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:0 0 60px;
+  }
+  .phone{
+    width:100%;
+    max-width:460px;
+    background:var(--frame);
+    min-height:100vh;
+    position:relative;
+    box-shadow:0 0 0 1px var(--line), 0 40px 90px -30px rgba(0,0,0,.8);
+  }
+  @media(min-width:520px){
+    body{padding:28px 12px;}
+    .phone{min-height:auto; border-radius:28px; overflow:hidden;}
+  }
+
+  /* ---------- Scoreboard header ---------- */
+  .scorebar{
+    background:linear-gradient(180deg,#0f1d33,#0a1626);
+    padding:14px 16px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  .field-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Roboto Mono',monospace; font-size:11px; color:var(--text-faint);
+    letter-spacing:.03em; margin-bottom:10px;
+  }
+  .live-pill{
+    display:inline-flex; align-items:center; gap:5px;
+    background:var(--red-dim); color:#ff8a97;
+    padding:2px 9px 2px 7px; border-radius:20px; font-weight:700; font-size:10px;
+    letter-spacing:.08em;
+  }
+  .live-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--red); animation:pulse 1.4s infinite;}
+  .live-pill.off{background:var(--surface-2); color:var(--text-faint);}
+  .live-pill.off .dot{background:var(--text-faint); animation:none;}
+  @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.25}}
+
+  .teams-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .team{display:flex; flex-direction:column; align-items:center; gap:6px; width:78px;}
+  .team img{width:44px; height:44px; object-fit:contain; filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));}
+  .team .tname{font-size:12px; font-weight:700; color:var(--text-dim); text-align:center; line-height:1.2;}
+  .score-mid{display:flex; align-items:baseline; gap:10px; font-family:'Oswald',sans-serif;}
+  .score-mid .num{font-size:44px; font-weight:600; line-height:1;}
+  .score-mid .num.lead{color:#fff;}
+  .score-mid .dash{font-size:26px; color:var(--text-faint); font-weight:400;}
+  .inning-tag{
+    text-align:center; margin-top:10px; font-family:'Oswald',sans-serif;
+    font-size:13px; letter-spacing:.06em; color:var(--gold); font-weight:600;
+  }
+
+  /* ---------- current matchup ---------- */
+  .matchup{
+    display:flex; align-items:center; background:linear-gradient(90deg,#132038 0%, #1a1420 100%);
+    border-bottom:1px solid var(--line);
+  }
+  .mside{flex:1; display:flex; align-items:center; gap:8px; padding:10px 12px; min-width:0;}
+  .mside.hit{flex-direction:row-reverse; text-align:right;}
+  .mside img{width:38px; height:38px; border-radius:50%; object-fit:cover; background:#1c2c47; border:2px solid var(--line); flex-shrink:0;}
+  .mside .mtxt{min-width:0;}
+  .mside .role{font-size:9px; color:var(--text-faint); letter-spacing:.1em;}
+  .mside .nm{font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .vs-mid{
+    flex-shrink:0; font-family:'Oswald',sans-serif; font-size:11px; color:var(--text-faint);
+    padding:0 6px; letter-spacing:.05em;
+  }
+
+  /* ---------- live pitch hero panel (NPB-style) ---------- */
+  .live-panel{
+    background:linear-gradient(180deg,#0d1b30,#0a1626);
+    border-bottom:1px solid var(--line);
+    padding:12px 12px 14px;
+  }
+  .live-zone-box{
+    display:flex; align-items:flex-start; gap:10px;
+  }
+  .live-zone-svg{flex-shrink:0; width:150px;}
+  .live-zone-svg svg{display:block; width:150px; height:158px;}
+  .live-inset{
+    flex:1; display:flex; flex-direction:column; align-items:flex-end; gap:10px;
+    padding-top:4px;
+  }
+  .diamond{width:34px; height:34px; position:relative; flex-shrink:0;}
+  .diamond .base{
+    position:absolute; width:9px; height:9px; background:var(--surface-2); border:1.5px solid var(--text-faint);
+    transform:rotate(45deg); border-radius:2px;
+  }
+  .diamond .base.on{background:var(--gold); border-color:var(--gold); box-shadow:0 0 8px rgba(244,183,58,.7);}
+  .diamond .b1{right:0; bottom:11px;}
+  .diamond .b2{left:11px; top:0;}
+  .diamond .b3{left:0; bottom:11px;}
+  .bso{display:flex; flex-direction:column; gap:4px; font-family:'Oswald',sans-serif; font-size:11px; align-items:flex-end;}
+  .bso .grp{display:flex; align-items:center; gap:5px;}
+  .bso .lbl{color:var(--text-faint); width:12px; font-weight:600; text-align:right;}
+  .pip{width:9px; height:9px; border-radius:50%; background:var(--surface-2); border:1px solid var(--line);}
+  .pip.b-on{background:var(--green); border-color:var(--green);}
+  .pip.s-on{background:var(--gold); border-color:var(--gold);}
+  .pip.o-on{background:var(--red); border-color:var(--red);}
+  .live-pitch-label{
+    margin-top:10px; font-size:10px; color:var(--text-faint); letter-spacing:.08em; font-weight:700;
+  }
+  .live-pitch-summary{margin-top:4px;}
+  .live-pitch-top{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;}
+  .live-speed{font-family:'Oswald',sans-serif; font-size:22px; font-weight:700; color:var(--text);}
+  .live-speed small{font-size:11px; color:var(--text-faint); font-weight:500; margin-left:2px;}
+  .live-seq{font-size:10.5px; color:var(--text-faint); font-family:'Roboto Mono',monospace;}
+  .live-pitch-result{font-size:13px; color:var(--text); margin-top:2px; font-weight:500;}
+  .live-pitch-summary .hit-stats{margin-top:8px; margin-left:0; padding-left:10px;}
+  .bso .pips{display:flex; gap:3px;}
+
+  .game-end-panel{
+    padding:18px 16px 20px; text-align:center; background:linear-gradient(180deg,#0d1b30,#0a1626);
+    border-bottom:1px solid var(--line);
+  }
+  .ge-title{
+    font-family:'Oswald',sans-serif; font-size:15px; letter-spacing:.06em; color:var(--gold);
+    font-weight:700; margin-bottom:12px;
+  }
+  .ge-grid{display:flex; flex-direction:column; gap:6px; max-width:320px; margin:0 auto;}
+  .ge-row{
+    display:flex; justify-content:space-between; align-items:center; background:var(--surface-2);
+    border:1px solid var(--line); padding:8px 14px; border-radius:8px; font-size:12.5px;
+  }
+  .ge-row .k{color:var(--text-faint);}
+  .ge-row .v{color:var(--text); font-weight:700;}
+  .ge-empty{color:var(--text-faint); font-size:12px;}
+
+  /* ---------- controls ---------- */
+  .controls{
+    padding:14px 16px; background:var(--surface); border-bottom:1px solid var(--line);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .id-builder{display:flex; align-items:center; gap:6px;}
+  .id-builder input{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    font-family:'Roboto Mono',monospace; font-size:13px; border-radius:8px; padding:8px 6px;
+    text-align:center; min-width:0;
+  }
+  .id-builder .yr{width:64px;}
+  .id-builder .kind{width:34px; text-transform:uppercase;}
+  .id-builder .sep{color:var(--text-faint); font-weight:700;}
+  .id-builder .num-wrap{display:flex; align-items:center; gap:0; flex:1;}
+  .id-builder .num{width:100%; border-radius:0; text-align:center;}
+  .stepper{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text-dim);
+    width:30px; height:34px; font-size:16px; cursor:pointer; user-select:none;
+  }
+  .stepper:first-of-type{border-radius:8px 0 0 8px; border-right:none;}
+  .stepper:last-of-type{border-radius:0 8px 8px 0; border-left:none;}
+  .id-builder .num{border-radius:0; border-left:none; border-right:none;}
+
+  .btn-row{display:flex; gap:8px;}
+  .btn{
+    flex:1; border:none; border-radius:10px; padding:10px 12px; font-family:'Noto Sans TC';
+    font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+    transition:transform .1s, filter .15s;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--red); color:#fff;}
+  .btn-primary:hover{filter:brightness(1.1);}
+  .btn-ghost{background:var(--surface-2); color:var(--text); border:1px solid var(--line);}
+  .btn-ghost:hover{filter:brightness(1.15);}
+  .btn svg{width:14px; height:14px;}
+  .spin{animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .status-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:11px; color:var(--text-faint); font-family:'Roboto Mono',monospace;
+  }
+  .auto-toggle{display:flex; align-items:center; gap:6px; cursor:pointer;}
+  .switch{width:30px; height:17px; border-radius:20px; background:var(--surface-2); border:1px solid var(--line); position:relative; transition:background .2s;}
+  .switch::after{content:''; position:absolute; width:13px; height:13px; border-radius:50%; background:var(--text-faint); top:1px; left:1px; transition:.2s;}
+  .switch.on{background:var(--green-dim); border-color:var(--green);}
+  .switch.on::after{background:var(--green); left:14px;}
+  .countdown-ring{font-variant-numeric:tabular-nums;}
+
+  details.manual{margin-top:2px;}
+  details.manual summary{font-size:11px; color:var(--text-faint); cursor:pointer; list-style:none;}
+  details.manual summary::-webkit-details-marker{display:none;}
+  details.manual textarea{
+    width:100%; margin-top:6px; background:var(--surface-2); border:1px solid var(--line);
+    color:var(--text); font-family:'Roboto Mono',monospace; font-size:11px; border-radius:8px; padding:8px; height:70px;
+  }
+  details.manual .btn{margin-top:6px;}
+
+  .error-compact{
+    margin:10px 16px; background:var(--red-dim); border:1px solid #7a2432;
+    border-radius:14px; overflow:hidden; font-size:12.5px;
+  }
+  .error-compact.notice{background:#12314a; border-color:#2a4b6d;}
+  .error-compact-summary{
+    list-style:none; cursor:pointer; padding:7px 12px; font-size:12px; font-weight:700;
+    color:#ffc3ca; display:flex; align-items:center; gap:6px; user-select:none;
+  }
+  .error-compact.notice .error-compact-summary{color:#a9c6ea;}
+  .error-compact-summary::-webkit-details-marker{display:none;}
+  .error-compact-summary::after{content:'展開詳情 ▾'; margin-left:auto; font-size:10px; font-weight:500; opacity:.75;}
+  .error-compact[open] .error-compact-summary::after{content:'收合 ▴';}
+  .error-compact-body{
+    padding:2px 14px 12px; line-height:1.6; color:#ffc3ca; border-top:1px solid rgba(255,255,255,.08);
+    padding-top:8px;
+  }
+  .error-compact.notice .error-compact-body{color:#a9c6ea;}
+  .error-compact-body b{color:#fff;}
+
+  .linescore{padding:12px 16px; overflow-x:auto; border-bottom:1px solid var(--line);}
+  .linescore table{border-collapse:collapse; width:100%; font-family:'Roboto Mono',monospace; font-size:11px;}
+  .linescore th,.linescore td{padding:4px 6px; text-align:center; color:var(--text-dim); white-space:nowrap;}
+  .linescore th{color:var(--text-faint); font-weight:500; border-bottom:1px solid var(--line);}
+  .linescore td.team-name{text-align:left; color:var(--text); font-weight:700; font-family:'Noto Sans TC';}
+  .linescore td.tot{color:var(--gold); font-weight:700;}
+
+  /* ---------- feed ---------- */
+  .feed{padding:4px 0 20px;}
+  .half-inning-head{
+    display:flex; align-items:center; gap:8px; padding:16px 16px 6px;
+  }
+  .half-inning-head .line{flex:1; height:1px; background:var(--line);}
+  .half-inning-head .txt{
+    font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:.06em; color:var(--text-dim);
+    font-weight:600; white-space:nowrap;
+  }
+
+  .pa-card{
+    margin:10px 12px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .pa-card.current{border-color:var(--red); box-shadow:0 0 0 1px var(--red), 0 8px 24px -8px rgba(224,38,63,.5);}
+  .pa-head{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--surface-2);
+  }
+  .pa-head img{width:32px; height:32px; border-radius:50%; object-fit:cover; background:#233a5c; border:1.5px solid var(--line);}
+  .pa-head .vs-block{flex:1; min-width:0; display:flex; align-items:center; gap:6px; font-size:12.5px;}
+  .pa-head .vs-block .p-nm, .pa-head .vs-block .h-nm{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88px;}
+  .pa-head .vs-block .p-nm{color:var(--blue);}
+  .pa-head .vs-block .h-nm{color:var(--gold);}
+  .pa-head .vs-sep{color:var(--text-faint); font-size:10px;}
+  .outcome-badge{
+    font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; flex-shrink:0;
+    white-space:nowrap;
+  }
+  .oc-hit{background:var(--gold-dim); color:var(--gold);}
+  .oc-out{background:var(--red-dim); color:#ff8a97;}
+  .oc-walk{background:#12314a; color:var(--blue);}
+  .oc-live{background:var(--red); color:#fff;}
+
+  .pa-body{display:flex; gap:10px; padding:12px; flex-wrap:wrap;}
+  .zone-wrap{flex-shrink:0;}
+  .zone-wrap svg{display:block; width:150px; height:158px;}
+  .pitch-list{flex:1; min-width:160px; display:flex; flex-direction:column; gap:6px;}
+  .pitch-row{
+    display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--surface-2);
+    border-radius:8px; font-size:11.5px;
+  }
+  .pitch-row .num{
+    width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:'Oswald',sans-serif; font-weight:700; font-size:10.5px; flex-shrink:0; color:#0a1120;
+  }
+  .num.c-ball{background:var(--green);}
+  .num.c-strike{background:var(--gold);}
+  .num.c-play{background:var(--red); color:#fff;}
+  .pitch-row .pinfo{flex:1; min-width:0;}
+  .pitch-row .ptxt{color:var(--text); line-height:1.35;}
+  .pitch-row .pmeta{color:var(--text-faint); font-family:'Roboto Mono',monospace; font-size:10px; margin-top:1px;}
+  .type-pill{
+    font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; flex-shrink:0;
+    background:var(--surface); border:1px solid var(--line); color:var(--text-dim);
+  }
+  .event-row{
+    display:flex; align-items:center; gap:7px; padding:4px 8px 4px 26px;
+    font-size:10.5px; color:var(--text-faint); font-style:italic;
+  }
+  .event-dot{width:4px; height:4px; border-radius:50%; background:var(--text-faint); flex-shrink:0;}
+
+  .pitch-row-wrap{display:flex; flex-direction:column; gap:5px;}
+  .hit-stats{
+    display:flex; align-items:center; gap:8px; padding:7px 8px 7px 30px;
+    background:linear-gradient(90deg, rgba(224,38,63,.08), rgba(224,38,63,0));
+    border-left:2px solid var(--red); border-radius:0 8px 8px 0; margin-left:2px;
+  }
+  .hit-chips{display:flex; flex-wrap:wrap; gap:8px; flex:1;}
+  .hit-chip{display:flex; flex-direction:column; align-items:flex-start; line-height:1.1;}
+  .hit-chip .hv{font-family:'Roboto Mono',monospace; font-size:12.5px; font-weight:700; color:var(--text);}
+  .hit-chip .hl{font-size:8.5px; color:var(--text-faint); letter-spacing:.02em;}
+  .hit-arc-link{
+    position:relative; display:flex; flex-direction:column; align-items:center; flex-shrink:0;
+    text-decoration:none; border-radius:8px; padding:2px; transition:background .15s;
+  }
+  .hit-arc-link:hover, .hit-arc-link:active{background:rgba(244,183,58,.12);}
+  .hit-arc-hint{
+    font-size:8px; color:var(--gold); font-weight:700; letter-spacing:.03em; margin-top:-4px;
+  }
+
+  .empty-state{padding:60px 20px; text-align:center; color:var(--text-faint);}
+  .empty-state svg{width:48px; height:48px; opacity:.4; margin-bottom:10px;}
+  .empty-state .t{font-weight:700; color:var(--text-dim); margin-bottom:4px;}
+
+  .footer-note{padding:16px; text-align:center; font-size:10.5px; color:var(--text-faint); line-height:1.7;}
+  .footer-note b{color:var(--text-dim);}
+
+  ::-webkit-scrollbar{width:6px; height:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+
+  /* ---------- floating bottom nav ---------- */
+  .fab-bar{
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+    z-index:60; display:flex; align-items:stretch; gap:2px;
+    padding:6px; border-radius:999px;
+    border:1px solid var(--line);
+    box-shadow:0 12px 32px -8px rgba(0,0,0,.6);
+    transition:background .2s, backdrop-filter .2s;
+  }
+  .fab-bar.style-transparent{
+    background:rgba(12,22,38,.55); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  }
+  .fab-bar.style-solid{ background:var(--frame); }
+  .fab-btn{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    background:none; border:none; color:var(--text-dim); padding:7px 16px; border-radius:999px;
+    font-family:'Noto Sans TC'; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
+  .fab-btn:active{background:rgba(255,255,255,.08);}
+  .fab-btn svg{width:20px; height:20px;}
+  .fab-btn .fab-label{font-size:9.5px; font-weight:600; letter-spacing:.02em;}
+  .fab-btn.accent{color:var(--gold);}
+
+  .sheet-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:70;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-backdrop.open{display:flex;}
+  .sheet{
+    width:100%; max-width:460px; background:var(--frame); border:1px solid var(--line); border-bottom:none;
+    border-radius:20px 20px 0 0; padding:14px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    max-height:70vh; overflow-y:auto; box-shadow:0 -12px 32px rgba(0,0,0,.5);
+    animation:sheet-up .22s ease-out;
+  }
+  @keyframes sheet-up{from{transform:translateY(24px); opacity:.4;} to{transform:translateY(0); opacity:1;}}
+  .sheet-handle{width:36px; height:4px; border-radius:2px; background:var(--line); margin:0 auto 12px;}
+  .sheet-title{font-family:'Oswald',sans-serif; font-size:15px; font-weight:600; color:var(--text); margin-bottom:12px; letter-spacing:.03em;}
+
+  .inning-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .inning-chip{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:9px 14px; font-size:12.5px; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+  }
+  .inning-chip:active{background:var(--surface);}
+  .inning-chip .team-dot{width:6px; height:6px; border-radius:50%; background:var(--gold); flex-shrink:0;}
+  .inning-empty{color:var(--text-faint); font-size:12.5px; padding:8px 0;}
+
+  .setting-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:12px 0; border-bottom:1px solid var(--line);
+  }
+  .setting-row:last-of-type{border-bottom:none;}
+  .setting-row .s-label{font-size:13px; color:var(--text); font-weight:600;}
+  .setting-row .s-sub{font-size:10.5px; color:var(--text-faint); margin-top:2px;}
+  .seconds-input-wrap{display:flex; align-items:center; gap:6px; flex-shrink:0;}
+  .seconds-input-wrap input{
+    width:52px; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:7px; text-align:center; font-family:'Roboto Mono',monospace; font-size:13px;
+  }
+  .seconds-input-wrap span{font-size:11px; color:var(--text-faint);}
+  .seg-toggle{display:flex; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:2px; flex-shrink:0;}
+  .seg-toggle button{
+    border:none; background:none; color:var(--text-faint); font-size:11.5px; font-weight:700;
+    padding:6px 12px; border-radius:8px; cursor:pointer; font-family:'Noto Sans TC';
+  }
+  .seg-toggle button.active{background:var(--red); color:#fff;}
+
+  :focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+</style>
+</head>
+<body>
+<div class="phone" id="app">
+
+  <div class="scorebar">
+    <div class="field-row">
+      <span id="fieldName">— · —</span>
+      <span id="livePillWrap"><span class="live-pill off" id="livePill"><span class="dot"></span><span id="liveText">載入中</span></span></span>
+    </div>
+    <div class="teams-row">
+      <div class="team">
+        <img id="visLogo" src="" alt="" onerror="this.style.visibility='hidden'">
+        <div class="tname" id="visName">客隊</div>
+      </div>
+      <div class="score-mid">
+        <span class="num" id="visScore">-</span>
+        <span class="dash">–</span>
+        <span class="num lead" id="homeScore">-</span>
+      </div>
+      <div class="team">
+        <img id="homeLogo" src="" alt="" onerror="this.style.visibility='hidden'">
+        <div class="tname" id="homeName">主隊</div>
+      </div>
+    </div>
+    <div class="inning-tag" id="inningTag">尚未載入資料</div>
+  </div>
+
+  <div class="controls">
+    <div class="id-builder">
+      <input class="yr" id="inYear" type="text" value="2026" maxlength="4" inputmode="numeric" aria-label="年份">
+      <span class="sep">-</span>
+      <input class="kind" id="inKind" type="text" value="A" maxlength="1" aria-label="賽事代碼">
+      <span class="sep">-</span>
+      <div class="num-wrap">
+        <button class="stepper" id="numDown" aria-label="減少場次">−</button>
+        <input class="num" id="inNum" type="number" value="298" min="1" aria-label="場次編號">
+        <button class="stepper" id="numUp" aria-label="增加場次">＋</button>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="loadBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        載入此場次
+      </button>
+      <button class="btn btn-ghost" id="refreshBtn">
+        <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v6h-6"/></svg>
+        重新整理
+      </button>
+    </div>
+    <div class="status-row">
+      <span>最後更新：<span id="lastUpdate">尚未更新</span></span>
+      <label class="auto-toggle" id="autoToggleWrap">
+        <span id="autoLabel">自動更新（5秒）</span>
+        <span class="switch on" id="autoSwitch"></span>
+      </label>
+    </div>
+    <details class="manual" id="manualDetails">
+      <summary>抓取失敗？點此手動貼上 JSON 內容</summary>
+      <div style="font-size:11px; color:var(--text-faint); margin-top:6px; line-height:1.6;">
+        步驟：① <a id="manualDirectLink" href="#" target="_blank" rel="noopener" style="color:var(--gold);">在新分頁打開 API 網址</a> ② 全選（Ctrl/Cmd+A）並複製全部內容 ③ 貼到下方欄位
+      </div>
+      <textarea id="manualJson" placeholder="將 API 回傳的 JSON 內容貼在這裡"></textarea>
+      <div class="btn-row" style="margin-top:6px;">
+        <button class="btn btn-ghost" id="pasteClipboardBtn" style="flex:1;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/></svg>
+          從剪貼簿貼上並套用
+        </button>
+      </div>
+      <button class="btn btn-ghost" id="manualLoadBtn" style="width:100%; margin-top:6px;">套用貼上的 JSON</button>
+    </details>
+  </div>
+
+  <div id="errorArea"></div>
+
+  <div class="matchup" id="matchupWrap" style="display:none;">
+    <div class="mside">
+      <img id="curPitcherImg" src="" alt="">
+      <div class="mtxt"><div class="role">投手 PITCHER</div><div class="nm" id="curPitcherName">—</div></div>
+    </div>
+    <div class="vs-mid">VS</div>
+    <div class="mside hit">
+      <img id="curHitterImg" src="" alt="">
+      <div class="mtxt"><div class="role" style="text-align:right;">打者 BATTER</div><div class="nm" id="curHitterName">—</div></div>
+    </div>
+  </div>
+  <div class="live-panel" id="livePanelWrap" style="display:none;">
+    <div class="live-zone-box">
+      <div class="live-zone-svg" id="liveZoneSvg"></div>
+      <div class="live-inset">
+        <div class="diamond">
+          <div class="base b1" id="baseFirst"></div>
+          <div class="base b2" id="baseSecond"></div>
+          <div class="base b3" id="baseThird"></div>
+        </div>
+        <div class="bso">
+          <div class="grp"><span class="lbl">B</span><span class="pips" id="pipsB"></span></div>
+          <div class="grp"><span class="lbl">S</span><span class="pips" id="pipsS"></span></div>
+          <div class="grp"><span class="lbl">O</span><span class="pips" id="pipsO"></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="live-pitch-label">最新一球</div>
+    <div id="livePitchBar"></div>
+  </div>
+
+  <div class="game-end-panel" id="gameEndPanel" style="display:none;">
+    <div class="ge-title">🏁 比賽結束</div>
+    <div class="ge-grid" id="geGrid"></div>
+  </div>
+
+  <div id="linescoreArea"></div>
+  <div id="feedArea">
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M12 3a9 9 0 0 0 0 18M3 12h18"/></svg>
+      <div class="t">尚未載入比賽資料</div>
+      <div>設定上方場次編號後按「載入此場次」</div>
+    </div>
+  </div>
+
+  <div class="footer-note" id="footerNote"></div>
+
+  <div class="fab-bar style-transparent" id="fabBar">
+    <button class="fab-btn" id="fabTopBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      <span class="fab-label">回頂部</span>
+    </button>
+    <button class="fab-btn" id="fabInningBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+      <span class="fab-label">局數</span>
+    </button>
+    <button class="fab-btn" id="fabSettingsBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .35 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.35 1.7 1.7 0 0 0-1.05 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.87.35l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-1.56-1.05H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.35-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1.05-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.87-.35l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.36 9a1.7 1.7 0 0 0 1.56 1.05H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
+      <span class="fab-label">設定</span>
+    </button>
+  </div>
+
+  <div class="sheet-backdrop" id="inningSheetBackdrop">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">跳至局數</div>
+      <div class="inning-grid" id="inningGrid"></div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="settingsSheetBackdrop">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">頁面設定</div>
+      <div class="setting-row">
+        <div>
+          <div class="s-label">自動更新頻率</div>
+          <div class="s-sub">比賽進行中每隔幾秒重新抓取一次</div>
+        </div>
+        <div class="seconds-input-wrap">
+          <input type="number" id="settingSeconds" min="3" max="60" value="5">
+          <span>秒</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="s-label">底部工具列樣式</div>
+          <div class="s-sub">回頂部／局數／設定 那條浮動列</div>
+        </div>
+        <div class="seg-toggle" id="barStyleToggle">
+          <button data-style="transparent">透明</button>
+          <button data-style="solid">實體</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const API_BASE = "https://derek9501.github.io/get/history/";
+  const CORS_PROXIES = [
+    url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+    url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+    url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
+    url => "https://thingproxy.freeboard.io/fetch/" + url,
+  ];
+
+  let currentData = null;
+  let autoEnabled = true;
+  let autoTimer = null;
+  let isLoading = false;
+  let halfInningNav = []; // populated by renderFeed: [{id, label}]
+
+  const SETTINGS_KEY = 'cpbl-tracker-settings-v1';
+  function loadSettings(){
+    let s = {};
+    try{ s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }catch(e){ s = {}; }
+    return {
+      refreshSeconds: Number(s.refreshSeconds) > 0 ? Number(s.refreshSeconds) : 5,
+      barStyle: s.barStyle === 'solid' ? 'solid' : 'transparent',
+    };
+  }
+  function saveSettings(s){
+    try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }catch(e){ /* ignore */ }
+  }
+  let settings = loadSettings();
+  let AUTO_REFRESH_MS = settings.refreshSeconds * 1000;
+
+  const PITCH_TYPE_MAP = {
+    fastball: {label:'速球', color:'#e0263f'},
+    breakingball: {label:'變化球', color:'#4f8ff0'},
+    offspeed: {label:'慢速球', color:'#f4b73a'},
+  };
+
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function nowStr(){
+    const d = new Date();
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  // Data source pattern: https://derek9501.github.io/get/history/{kind}/{year}/{num}.json
+  function buildGameId(){
+    const y = $('inYear').value.trim() || '2026';
+    const k = ($('inKind').value.trim() || 'A').toUpperCase();
+    const n = $('inNum').value.trim() || '1';
+    return `${k}/${y}/${n}`;
+  }
+
+  function buildUrl(gameId){
+    return API_BASE + gameId.split('/').map(encodeURIComponent).join('/') + '.json';
+  }
+
+  $('numDown').addEventListener('click', ()=>{
+    const el = $('inNum');
+    el.value = Math.max(1, (parseInt(el.value||'1',10) - 1));
+  });
+  $('numUp').addEventListener('click', ()=>{
+    const el = $('inNum');
+    el.value = (parseInt(el.value||'0',10) + 1);
+  });
+
+  $('loadBtn').addEventListener('click', ()=> fetchGame(true));
+  $('refreshBtn').addEventListener('click', ()=> fetchGame(false));
+  $('autoToggleWrap').addEventListener('click', ()=>{
+    autoEnabled = !autoEnabled;
+    $('autoSwitch').classList.toggle('on', autoEnabled);
+    scheduleAuto();
+  });
+  $('manualLoadBtn').addEventListener('click', ()=>{
+    try{
+      const txt = $('manualJson').value.trim();
+      const json = JSON.parse(txt);
+      currentData = json;
+      renderAll(json);
+      $('lastUpdate').textContent = nowStr() + '（手動貼上）';
+      $('errorArea').innerHTML = '';
+    }catch(e){
+      showError('JSON 格式無法解析，請確認貼上的內容完整。<br><b>錯誤訊息：</b>' + escapeHtml(e.message));
+    }
+  });
+
+  $('pasteClipboardBtn').addEventListener('click', async ()=>{
+    try{
+      if(!navigator.clipboard || !navigator.clipboard.readText){
+        throw new Error('此瀏覽器不支援自動讀取剪貼簿，請改用下方欄位手動貼上（長按 → 貼上）。');
+      }
+      const txt = await navigator.clipboard.readText();
+      if(!txt || !txt.trim()){
+        throw new Error('剪貼簿是空的，請先在 CPBL 頁面點一次「複製JSON」書籤。');
+      }
+      $('manualJson').value = txt;
+      const json = JSON.parse(txt);
+      currentData = json;
+      renderAll(json);
+      $('lastUpdate').textContent = nowStr() + '（剪貼簿貼上）';
+      $('errorArea').innerHTML = '';
+      $('manualDetails').removeAttribute('open');
+    }catch(e){
+      showError('無法從剪貼簿套用資料。<br><b>錯誤訊息：</b>' + escapeHtml(e.message || String(e)) +
+        '<br>請確認已在 CPBL 頁面點過「複製JSON」書籤，且瀏覽器有授權剪貼簿權限。');
+    }
+  });
+
+  function setLoadingIcon(on){
+    $('refreshIcon').classList.toggle('spin', on);
+  }
+
+  async function fetchGame(isManualLoad){
+    if(isLoading) return;
+    isLoading = true;
+    setLoadingIcon(true);
+    const gameId = buildGameId();
+    const url = buildUrl(gameId);
+    $('manualDirectLink').href = url;
+    let json = null;
+    let lastErr = null;
+
+    let triedVia = 'direct';
+    try{
+      const res = await fetch(url, {mode:'cors', cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      json = await res.json();
+    }catch(e1){
+      lastErr = e1;
+      for(const buildProxyUrl of CORS_PROXIES){
+        try{
+          const res2 = await fetch(buildProxyUrl(url), {cache:'no-store'});
+          if(!res2.ok) throw new Error('HTTP ' + res2.status);
+          json = await res2.json();
+          lastErr = null;
+          triedVia = 'proxy';
+          break;
+        }catch(e2){
+          lastErr = e2;
+        }
+      }
+    }
+
+    isLoading = false;
+    setLoadingIcon(false);
+
+    if(!json || !json.Data || !json.Data.Game){
+      showError(
+        `無法讀取 <b>${escapeHtml(url)}</b>（直接連線與 ${CORS_PROXIES.length} 個備援 proxy 都失敗）。<br>` +
+        `最常見原因是 CPBL 網站沒有開放跨網域（CORS）存取，或 proxy 服務暫時不可用。<br>` +
+        `請試試：<br>` +
+        `① <a href="${url}" target="_blank" rel="noopener" style="color:#f4b73a;">點此在新分頁打開該網址</a>，全選頁面內容並複製（Ctrl/Cmd+A → Ctrl/Cmd+C）<br>` +
+        `② 貼到下方「手動貼上 JSON」欄位，按「套用貼上的 JSON」<br>` +
+        `③ 之後若要更新，重複同樣步驟即可（自動更新在這種模式下無法運作）` +
+        (lastErr ? `<br><b>最後錯誤訊息：</b>${escapeHtml(String(lastErr.message || lastErr))}` : '')
+      );
+      return;
+    }
+    if(triedVia === 'proxy'){
+      showNotice('⚡ 目前透過備援 proxy 連線（CPBL 直連被 CORS 擋下），速度可能較慢，自動更新仍會持續嘗試。');
+    } else {
+      $('errorArea').innerHTML = '';
+    }
+
+    currentData = json;
+    renderAll(json);
+    $('lastUpdate').textContent = nowStr();
+    scheduleAuto();
+    updateUrlParams();
+  }
+
+  function updateUrlParams(){
+    try{
+      const params = new URLSearchParams(window.location.search);
+      params.set('y', $('inYear').value.trim());
+      params.set('T', $('inKind').value.trim().toUpperCase());
+      params.set('num', $('inNum').value.trim());
+      const newUrl = window.location.pathname + '?' + params.toString();
+      window.history.replaceState(null, '', newUrl);
+    }catch(e){ /* ignore (e.g. file:// URLs without history support) */ }
+  }
+
+  function showError(html){
+    $('errorArea').innerHTML = `
+      <details class="error-compact">
+        <summary class="error-compact-summary">⚠️ 無法讀取</summary>
+        <div class="error-compact-body">${html}</div>
+      </details>`;
+  }
+  function showNotice(html){
+    $('errorArea').innerHTML = `
+      <details class="error-compact notice">
+        <summary class="error-compact-summary">⚡ 透過備援連線中</summary>
+        <div class="error-compact-body">${html}</div>
+      </details>`;
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function updateAutoLabel(){
+    const el = $('autoLabel');
+    if(el) el.textContent = `自動更新（${settings.refreshSeconds}秒）`;
+  }
+
+  function scheduleAuto(){
+    if(autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+    if(!autoEnabled) return;
+    if(currentData && currentData.Data && currentData.Data.Game && isGameOver(currentData.Data.Game)) return;
+    autoTimer = setInterval(()=> fetchGame(false), AUTO_REFRESH_MS);
+  }
+
+  /* ---------------- Rendering ---------------- */
+
+  function renderAll(json){
+    const g = json.Data.Game;
+    renderScorebar(g);
+    renderMatchup(g);
+    renderLinescore(g);
+    renderFeed(g);
+    renderFooter(g);
+  }
+
+  function statusText(status){
+    if(/END|FINAL|FINISH/i.test(status)) return {text:'比賽結束', live:false};
+    if(/STOP|CANCEL|SUSP|POSTPON/i.test(status)) return {text:'比賽中止', live:false};
+    if(/PRE|READY|SCHEDULE/i.test(status)) return {text:'尚未開賽', live:false};
+    return {text:'比賽進行中', live:true};
+  }
+
+  function isGameOver(g){
+    if(!statusText(g.GameStatus).live) return true;
+    const log = g.LiveLog || [];
+    if(log.length){
+      const last = log[log.length-1];
+      const txt = (last.Content||'') + (last.ActionName||'');
+      if(txt.includes('比賽結束')) return true;
+    }
+    return false;
+  }
+
+  function renderScorebar(g){
+    $('fieldName').textContent = `${g.Field?.Abbe || ''} ${g.Field?.No ? '('+g.Field.No+')' : ''}`.trim() || '—';
+    const st = statusText(g.GameStatus);
+    const pill = $('livePill');
+    pill.classList.toggle('off', !st.live);
+    $('liveText').textContent = st.text;
+
+    $('visLogo').src = g.Visiting.Team.SmallLogoUrl || '';
+    $('visLogo').style.visibility = 'visible';
+    $('visName').textContent = g.Visiting.Team.Name;
+    $('visScore').textContent = g.Visiting.Score;
+
+    $('homeLogo').src = g.Home.Team.SmallLogoUrl || '';
+    $('homeLogo').style.visibility = 'visible';
+    $('homeName').textContent = g.Home.Team.Name;
+    $('homeScore').textContent = g.Home.Score;
+
+    const log = g.LiveLog || [];
+    if(log.length && !isGameOver(g)){
+      const last = log[log.length-1];
+      const half = last.VisitingHomeType === '2' ? '下' : '上';
+      $('inningTag').textContent = `${last.InningSeq} 局${half}　${last.OutCnt} 出局`;
+    } else {
+      $('inningTag').textContent = st.text;
+    }
+  }
+
+  function renderMatchup(g){
+    const log = g.LiveLog || [];
+    if(!log.length){
+      $('matchupWrap').style.display = 'none';
+      $('livePanelWrap').style.display = 'none';
+      $('gameEndPanel').style.display = 'none';
+      return;
+    }
+    const last = log[log.length-1];
+
+    if(isGameOver(g)){
+      $('matchupWrap').style.display = 'none';
+      $('livePanelWrap').style.display = 'none';
+      $('gameEndPanel').style.display = 'block';
+
+      const rows = [];
+      if(g.MVP && g.MVP.Name) rows.push(['MVP', g.MVP.Name]);
+      if(g.WinningPitcher && g.WinningPitcher.Name) rows.push(['勝投', g.WinningPitcher.Name]);
+      if(g.LoserPitcher && g.LoserPitcher.Name) rows.push(['敗投', g.LoserPitcher.Name]);
+      if(g.Closer && g.Closer.Name) rows.push(['救援', g.Closer.Name]);
+      $('geGrid').innerHTML = rows.length
+        ? rows.map(([k,v]) => `<div class="ge-row"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`).join('')
+        : `<div class="ge-empty">賽事資訊尚未更新</div>`;
+      return;
+    }
+
+    $('matchupWrap').style.display = 'flex';
+    $('curPitcherImg').src = last.PitcherImgPath || '';
+    $('curPitcherName').textContent = last.PitcherName || '—';
+    $('curHitterImg').src = last.HitterImgPath || '';
+    $('curHitterName').textContent = last.HitterName || '—';
+
+    $('livePanelWrap').style.display = 'block';
+    $('gameEndPanel').style.display = 'none';
+
+    $('baseFirst').classList.toggle('on', !!last.FirstBase);
+    $('baseSecond').classList.toggle('on', !!last.SecondBase);
+    $('baseThird').classList.toggle('on', !!last.ThirdBase);
+
+    $('pipsB').innerHTML = [0,1,2].map(i=>`<span class="pip ${i < last.BallCnt ? 'b-on':''}"></span>`).join('');
+    $('pipsS').innerHTML = [0,1].map(i=>`<span class="pip ${i < last.StrikeCnt ? 's-on':''}"></span>`).join('');
+    $('pipsO').innerHTML = [0,1].map(i=>`<span class="pip ${i < last.OutCnt ? 'o-on':''}"></span>`).join('');
+
+    // current (still-in-progress or most recently finished) plate appearance,
+    // rendered big & prominent like an NPB-style live pitch view
+    const paGroups = groupPlateAppearances(log);
+    const currentPa = paGroups[paGroups.length - 1];
+    $('liveZoneSvg').innerHTML = zoneSvg(currentPa, true);
+
+    const seqList = withPitchSeq(currentPa.pitches);
+    const lastItem = seqList[seqList.length-1];
+    const totalReal = seqList.filter(x => x.seq != null).length;
+
+    if(lastItem.isEvent){
+      const eventText = (lastItem.e.Content || lastItem.e.ActionName || '').trim() || '賽事動態';
+      $('livePitchBar').innerHTML = `
+        <div class="live-pitch-summary">
+          <div class="live-pitch-top">
+            <span class="type-pill">場邊動態</span>
+            <span class="live-seq">已投 ${totalReal} 球</span>
+          </div>
+          <div class="live-pitch-result">${escapeHtml(eventText)}</div>
+        </div>`;
+    } else {
+      const e = lastItem.e;
+      const tm = e.Trackman;
+      const isPlay = tm && tm.Hit;
+      const speed = tm && tm.Pitch && tm.Pitch.Release ? tm.Pitch.Release.RelSpeed : null;
+      const type = tm && tm.Play && tm.Play.PitchTag ? tm.Play.PitchTag.TaggedPitchType : null;
+      const typeInfo = PITCH_TYPE_MAP[type];
+      const resultText = (e.Content || '').trim() || (e.ActionName || '').trim() || '—';
+
+      $('livePitchBar').innerHTML = `
+        <div class="live-pitch-summary">
+          <div class="live-pitch-top">
+            ${typeInfo ? `<span class="type-pill" style="color:${typeInfo.color}; border-color:${typeInfo.color}66;">${typeInfo.label}</span>` : ''}
+            ${speed ? `<span class="live-speed">${speed.toFixed(1)}<small>km/h</small></span>` : ''}
+            <span class="live-seq">第 ${lastItem.seq} 球</span>
+          </div>
+          <div class="live-pitch-result">${escapeHtml(resultText)}</div>
+          ${isPlay ? hitStatsBlock(tm.Hit) : ''}
+        </div>`;
+    }
+  }
+
+  function renderLinescore(g){
+    const visInn = g.Visiting.InningScore || [];
+    const homeInn = g.Home.InningScore || [];
+    const maxInn = Math.max(visInn.length, homeInn.length, g.InningSeq || 0);
+    let cols = '';
+    for(let i=1;i<=maxInn;i++) cols += `<th>${i}</th>`;
+    function rowCells(arr){
+      let out = '';
+      for(let i=1;i<=maxInn;i++){
+        const f = arr.find(x=>x.Seq===i);
+        out += `<td>${f ? f.Score : ''}</td>`;
+      }
+      return out;
+    }
+    const html = `
+      <div class="linescore">
+        <table>
+          <thead><tr><th style="text-align:left;">隊伍</th>${cols}<th>R</th></tr></thead>
+          <tbody>
+            <tr><td class="team-name">${escapeHtml(g.Visiting.Team.Name)}</td>${rowCells(visInn)}<td class="tot">${g.Visiting.Score}</td></tr>
+            <tr><td class="team-name">${escapeHtml(g.Home.Team.Name)}</td>${rowCells(homeInn)}<td class="tot">${g.Home.Score}</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+    $('linescoreArea').innerHTML = html;
+  }
+
+  // Not every LiveLog entry is an actual pitch — pitching changes, mound visits,
+  // pickoff throws, steals, intentional-walk announcements etc. share the same
+  // log stream but carry IsBall=0 and IsStrike=0. Only count real pitches.
+  function isRealPitch(e){
+    return e.IsBall === '1' || e.IsStrike === '1';
+  }
+  function withPitchSeq(pitches){
+    let n = 0;
+    return pitches.map(e=>{
+      const real = isRealPitch(e);
+      if(real) n++;
+      return {e, seq: real ? n : null, isEvent: !real};
+    });
+  }
+
+  function groupPlateAppearances(log){
+    const groups = [];
+    let cur = null;
+    log.forEach(e=>{
+      const key = e.InningSeq + '|' + e.VisitingHomeType + '|' + e.HitterAcnt + '|' + e.BattingOrder;
+      if(!cur || cur.key !== key){
+        cur = {key, InningSeq:e.InningSeq, VisitingHomeType:e.VisitingHomeType, pitches:[]};
+        groups.push(cur);
+      }
+      cur.pitches.push(e);
+    });
+    return groups;
+  }
+
+  function groupByHalfInning(paGroups){
+    const halves = [];
+    let cur = null;
+    paGroups.forEach(pa=>{
+      const key = pa.InningSeq + '|' + pa.VisitingHomeType;
+      if(!cur || cur.key !== key){
+        cur = {key, InningSeq:pa.InningSeq, VisitingHomeType:pa.VisitingHomeType, pas:[]};
+        halves.push(cur);
+      }
+      cur.pas.push(pa);
+    });
+    return halves;
+  }
+
+  function outcomeBadge(pa){
+    const lastP = pa.pitches[pa.pitches.length-1];
+    const label = (lastP.ActionName || lastP.BattingActionName || lastP.Content || '').trim();
+    if(!label) return {label:'打席進行中', cls:'oc-live'};
+    if(/安打|全壘打|一安|二安|三安|全打/.test(label)) return {label, cls:'oc-hit'};
+    if(/四壞|觸身|保送/.test(label)) return {label, cls:'oc-walk'};
+    if(/三振|刺殺|接殺|封殺|雙殺|接球失誤|犧牲/.test(label)) return {label, cls:'oc-out'};
+    return {label, cls:'oc-out'};
+  }
+
+  function zoneSvg(pa, isCurrent){
+    // meter-space plotting bounds
+    const XMIN=-0.95, XMAX=0.95, YMIN=-0.35, YMAX=1.65;
+    const L=15,R=205,T=15,B=205;
+    const sx = (R-L)/(XMAX-XMIN), sy=(B-T)/(YMAX-YMIN);
+    const px = x => L + (x-XMIN)*sx;
+    const py = h => B - (h-YMIN)*sy;
+    // strike zone (approx standard, meters)
+    const SZL=-0.2159, SZR=0.2159, SZB=0.45, SZT=1.05;
+    const zx1=px(SZL), zx2=px(SZR), zy1=py(SZT), zy2=py(SZB);
+    const outerPad = 0.42;
+    const ox1=px(SZL-outerPad), ox2=px(SZR+outerPad), oy1=py(SZT+outerPad*0.9), oy2=py(SZB-outerPad*0.9);
+
+    const seqList = withPitchSeq(pa.pitches);
+    const totalReal = seqList.filter(x => x.seq != null).length;
+    const withLoc = seqList
+      .filter(x => x.seq != null && x.e.Trackman && x.e.Trackman.Pitch && x.e.Trackman.Pitch.Location);
+
+    let markers = '';
+    withLoc.forEach(({e,seq})=>{
+      const loc = e.Trackman.Pitch.Location;
+      const cx = px(loc.PlateLocSide), cy = py(loc.PlateLocHeight);
+      const isPlay = !!e.Trackman.Hit;
+      const isLastPitch = seq === totalReal;
+      let cls = 'c-strike';
+      if(e.IsBall === '1') cls = 'c-ball';
+      if(isPlay) cls = 'c-play';
+      const r = isLastPitch ? 12 : 9.5;
+      const fill = isPlay ? '#e0263f' : (e.IsBall==='1' ? '#33c98a' : '#f4b73a');
+      const op = isLastPitch ? 1 : 0.6;
+      markers += `
+        <g opacity="${op}">
+          <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="${fill}" stroke="#0a1120" stroke-width="1.5"/>
+          <text x="${cx.toFixed(1)}" y="${(cy+3.5).toFixed(1)}" font-family="Oswald, sans-serif" font-size="10" font-weight="700" fill="#0a1120" text-anchor="middle">${seq}</text>
+        </g>`;
+    });
+
+    if(!withLoc.length){
+      markers = `<text x="110" y="110" font-family="Noto Sans TC" font-size="11" fill="#5c7093" text-anchor="middle">無進壘點資料</text>`;
+    }
+
+    return `
+    <svg viewBox="0 0 220 230" xmlns="http://www.w3.org/2000/svg">
+      <rect x="${ox1.toFixed(1)}" y="${oy1.toFixed(1)}" width="${(ox2-ox1).toFixed(1)}" height="${(oy2-oy1).toFixed(1)}" fill="none" stroke="#25395a" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <rect x="${zx1.toFixed(1)}" y="${zy1.toFixed(1)}" width="${(zx2-zx1).toFixed(1)}" height="${(zy2-zy1).toFixed(1)}" fill="rgba(255,255,255,0.03)" stroke="#8ea0bb" stroke-width="1.5"/>
+      <line x1="${(zx1+(zx2-zx1)/3).toFixed(1)}" y1="${zy1.toFixed(1)}" x2="${(zx1+(zx2-zx1)/3).toFixed(1)}" y2="${zy2.toFixed(1)}" stroke="#25395a" stroke-width="1"/>
+      <line x1="${(zx1+(zx2-zx1)*2/3).toFixed(1)}" y1="${zy1.toFixed(1)}" x2="${(zx1+(zx2-zx1)*2/3).toFixed(1)}" y2="${zy2.toFixed(1)}" stroke="#25395a" stroke-width="1"/>
+      <line x1="${zx1.toFixed(1)}" y1="${(zy1+(zy2-zy1)/3).toFixed(1)}" x2="${zx2.toFixed(1)}" y2="${(zy1+(zy2-zy1)/3).toFixed(1)}" stroke="#25395a" stroke-width="1"/>
+      <line x1="${zx1.toFixed(1)}" y1="${(zy1+(zy2-zy1)*2/3).toFixed(1)}" x2="${zx2.toFixed(1)}" y2="${(zy1+(zy2-zy1)*2/3).toFixed(1)}" stroke="#25395a" stroke-width="1"/>
+      <path d="M ${(px(-0.22)).toFixed(1)} 214 L ${(px(0.22)).toFixed(1)} 214 L ${(px(0.22)).toFixed(1)} 221 L 110 228 L ${(px(-0.22)).toFixed(1)} 221 Z" fill="#182c48" stroke="#25395a" stroke-width="1"/>
+      ${markers}
+    </svg>`;
+  }
+
+  function hitArcSvg(angleDeg, distanceM){
+    // small decorative trajectory arc, echoing NPB-style launch visual.
+    // Positive angle arcs upward; negative angle dips the curve below the
+    // baseline to convey a hard chopper/grounder driven into the dirt.
+    const clampedAngle = Math.max(-45, Math.min(55, angleDeg));
+    const peak = clampedAngle * 0.42; // signed: negative -> curve dips down
+    const color = angleDeg < 0 ? '#8ea0bb' : (angleDeg > 25 ? '#33c98a' : '#f4b73a');
+    const w = 84, h = 46, baseY = 30;
+    const endX = w - 8;
+    const ctrlY = baseY - peak;
+    const endY = angleDeg < 0 ? Math.min(h-4, baseY + Math.abs(peak)*0.7) : baseY - 2;
+    return `
+      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="flex-shrink:0;">
+        <line x1="4" y1="${baseY}" x2="${w-4}" y2="${baseY}" stroke="#25395a" stroke-width="1" stroke-dasharray="2 2"/>
+        <path d="M 6 ${baseY} Q ${w/2} ${ctrlY.toFixed(1)} ${endX} ${endY.toFixed(1)}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="${endX}" cy="${endY.toFixed(1)}" r="3" fill="${color}"/>
+      </svg>`;
+  }
+
+  function hitAnimUrl(hit){
+    const angle = hit.Launch.Angle;
+    const dir = hit.Launch.Direction;
+    const dist = hit.LandingFlat ? hit.LandingFlat.Distance : 0;
+    const la = (angle!=null ? angle : 0).toFixed(2);
+    const dr = (dir!=null ? dir : 0).toFixed(2);
+    const ds = (dist!=null ? dist : 0).toFixed(2);
+    return `https://derek9501.github.io/Hit/?la=${la}&dir=${dr}&dist=${ds}`;
+  }
+
+  function hitStatsBlock(hit){
+    if(!hit || !hit.Launch) return '';
+    const speed = hit.Launch.ExitSpeed;
+    const angle = hit.Launch.Angle;
+    const dist = hit.LandingFlat ? hit.LandingFlat.Distance : null;
+    const hang = hit.LandingFlat ? hit.LandingFlat.HangTime : null;
+    const bearing = hit.LandingFlat ? hit.LandingFlat.Bearing : null;
+    return `
+      <div class="hit-stats">
+        <a class="hit-arc-link" href="${hitAnimUrl(hit)}" target="_blank" rel="noopener" title="點擊查看擊球動畫">
+          ${hitArcSvg(angle, dist||0)}
+          <span class="hit-arc-hint">▶ 動畫</span>
+        </a>
+        <div class="hit-chips">
+          <div class="hit-chip"><span class="hv">${speed.toFixed(1)}</span><span class="hl">初速 km/h</span></div>
+          <div class="hit-chip"><span class="hv">${angle.toFixed(1)}°</span><span class="hl">仰角</span></div>
+          ${dist!=null ? `<div class="hit-chip"><span class="hv">${dist.toFixed(1)}</span><span class="hl">距離 m</span></div>` : ''}
+          ${bearing!=null ? `<div class="hit-chip"><span class="hv">${bearing.toFixed(1)}°</span><span class="hl">方位角</span></div>` : ''}
+          ${hang!=null ? `<div class="hit-chip"><span class="hv">${hang.toFixed(2)}</span><span class="hl">滯空 秒</span></div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function eventRow(e){
+    const text = (e.Content || e.ActionName || '').trim() || '賽事事件';
+    return `
+      <div class="event-row">
+        <span class="event-dot"></span>
+        <span class="event-text">${escapeHtml(text)}</span>
+      </div>`;
+  }
+
+  function pitchRow(e, seq){
+    const tm = e.Trackman;
+    const isPlay = tm && tm.Hit;
+    const cls = isPlay ? 'c-play' : (e.IsBall==='1' ? 'c-ball' : 'c-strike');
+    const speed = tm && tm.Pitch && tm.Pitch.Release ? tm.Pitch.Release.RelSpeed : null;
+    const spin = tm && tm.Pitch && tm.Pitch.Release ? tm.Pitch.Release.SpinRate : null;
+    const type = tm && tm.Play && tm.Play.PitchTag ? tm.Play.PitchTag.TaggedPitchType : null;
+    const typeInfo = PITCH_TYPE_MAP[type];
+    const text = (e.Content || '').trim() || (e.ActionName || '').trim() || '—';
+    const metaParts = [];
+    if(speed) metaParts.push(`${speed.toFixed(1)} km/h`);
+    if(spin) metaParts.push(`${Math.round(spin)} rpm`);
+    metaParts.push(`B${e.BallCnt}-S${e.StrikeCnt}`);
+    return `
+      <div class="pitch-row-wrap">
+        <div class="pitch-row">
+          <span class="num ${cls}">${seq}</span>
+          <div class="pinfo">
+            <div class="ptxt">${escapeHtml(text)}</div>
+            <div class="pmeta">${metaParts.join(' · ')}</div>
+          </div>
+          ${typeInfo ? `<span class="type-pill" style="color:${typeInfo.color}; border-color:${typeInfo.color}66;">${typeInfo.label}</span>` : ''}
+        </div>
+        ${isPlay ? hitStatsBlock(tm.Hit) : ''}
+      </div>`;
+  }
+
+  function paCard(pa, isCurrent){
+    const first = pa.pitches[0];
+    const badge = outcomeBadge(pa);
+    const pitchRows = withPitchSeq(pa.pitches)
+      .slice()
+      .reverse()
+      .map(x => x.isEvent ? eventRow(x.e) : pitchRow(x.e, x.seq))
+      .join('');
+    return `
+      <div class="pa-card ${isCurrent ? 'current':''}">
+        <div class="pa-head">
+          <img src="${first.PitcherImgPath || ''}" alt="">
+          <div class="vs-block">
+            <span class="p-nm">${escapeHtml(first.PitcherName)}</span>
+            <span class="vs-sep">vs</span>
+            <span class="h-nm">${escapeHtml(first.HitterName)}</span>
+          </div>
+          <img src="${first.HitterImgPath || ''}" alt="" style="margin-left:-4px;">
+          <span class="outcome-badge ${isCurrent && badge.cls==='oc-live' ? 'oc-live' : badge.cls}">${escapeHtml(badge.label)}</span>
+        </div>
+        <div class="pa-body">
+          <div class="zone-wrap">${zoneSvg(pa, isCurrent)}</div>
+          <div class="pitch-list">${pitchRows}</div>
+        </div>
+      </div>`;
+  }
+
+  function renderFeed(g){
+    const log = g.LiveLog || [];
+    const area = $('feedArea');
+    if(!log.length){
+      halfInningNav = [];
+      area.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
+          <div class="t">比賽尚未開始</div>
+          <div>目前沒有任何投球紀錄</div>
+        </div>`;
+      return;
+    }
+    const paGroups = groupPlateAppearances(log);
+    const halves = groupByHalfInning(paGroups).reverse();
+    const lastPaKey = paGroups[paGroups.length-1].key;
+
+    let html = '';
+    halfInningNav = [];
+    halves.forEach(half=>{
+      const teamName = half.VisitingHomeType === '2' ? g.Home.Team.Name : g.Visiting.Team.Name;
+      const halfLabel = half.VisitingHomeType === '2' ? '下' : '上';
+      const domId = `inning-${half.InningSeq}-${half.VisitingHomeType}`;
+      halfInningNav.push({id: domId, label: `${half.InningSeq}局${halfLabel}`, teamName});
+      html += `
+        <div class="half-inning-head" id="${domId}">
+          <span class="txt">${half.InningSeq} 局${halfLabel} · ${escapeHtml(teamName)}進攻</span>
+          <span class="line"></span>
+        </div>`;
+      const pasRev = half.pas.slice().reverse();
+      pasRev.forEach(pa=>{
+        html += paCard(pa, pa.key === lastPaKey);
+      });
+    });
+    area.innerHTML = html;
+  }
+
+  function renderFooter(g){
+    let extra = '';
+    const st = statusText(g.GameStatus);
+    if(!st.live && g.WinningPitcher && g.WinningPitcher.Name){
+      extra = `勝投 <b>${escapeHtml(g.WinningPitcher.Name)}</b>　敗投 <b>${escapeHtml((g.LoserPitcher&&g.LoserPitcher.Name)||'—')}</b><br>`;
+    }
+    $('footerNote').innerHTML = `${extra}資料來源：CPBL 官方賽事 API（${escapeHtml(g.GameId)}）· 進壘點座標為 Trackman 追蹤資料，僅供參考`;
+  }
+
+  /* ---------------- Floating bottom nav (scroll-top / inning jump / settings) ---------------- */
+
+  function openSheet(el){ el.classList.add('open'); }
+  function closeSheet(el){ el.classList.remove('open'); }
+
+  $('fabTopBtn').addEventListener('click', ()=>{
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  $('fabInningBtn').addEventListener('click', ()=>{
+    const grid = $('inningGrid');
+    if(!halfInningNav.length){
+      grid.innerHTML = `<div class="inning-empty">目前還沒有可跳轉的局數</div>`;
+    } else {
+      // show most recent inning first, matching the feed's newest-first order
+      grid.innerHTML = halfInningNav.slice().reverse().map(h => `
+        <button class="inning-chip" data-target="${h.id}">
+          <span class="team-dot"></span>${escapeHtml(h.label)}
+        </button>`).join('');
+    }
+    openSheet($('inningSheetBackdrop'));
+  });
+
+  $('inningGrid').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.inning-chip');
+    if(!btn) return;
+    const target = document.getElementById(btn.dataset.target);
+    closeSheet($('inningSheetBackdrop'));
+    if(target){
+      setTimeout(()=> target.scrollIntoView({behavior:'smooth', block:'start'}), 150);
+    }
+  });
+
+  $('inningSheetBackdrop').addEventListener('click', (e)=>{
+    if(e.target === e.currentTarget) closeSheet(e.currentTarget);
+  });
+
+  $('fabSettingsBtn').addEventListener('click', ()=>{
+    $('settingSeconds').value = settings.refreshSeconds;
+    updateBarStyleToggleUI();
+    openSheet($('settingsSheetBackdrop'));
+  });
+
+  $('settingsSheetBackdrop').addEventListener('click', (e)=>{
+    if(e.target === e.currentTarget) closeSheet(e.currentTarget);
+  });
+
+  $('settingSeconds').addEventListener('change', ()=>{
+    let v = parseInt($('settingSeconds').value, 10);
+    if(!v || v < 3) v = 3;
+    if(v > 60) v = 60;
+    $('settingSeconds').value = v;
+    settings.refreshSeconds = v;
+    AUTO_REFRESH_MS = v * 1000;
+    saveSettings(settings);
+    updateAutoLabel();
+    scheduleAuto();
+  });
+
+  function updateBarStyleToggleUI(){
+    document.querySelectorAll('#barStyleToggle button').forEach(b=>{
+      b.classList.toggle('active', b.dataset.style === settings.barStyle);
+    });
+  }
+  $('barStyleToggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    settings.barStyle = btn.dataset.style;
+    saveSettings(settings);
+    updateBarStyleToggleUI();
+    $('fabBar').classList.toggle('style-solid', settings.barStyle === 'solid');
+    $('fabBar').classList.toggle('style-transparent', settings.barStyle === 'transparent');
+  });
+
+  // apply persisted settings on load
+  $('fabBar').classList.toggle('style-solid', settings.barStyle === 'solid');
+  $('fabBar').classList.toggle('style-transparent', settings.barStyle === 'transparent');
+  updateAutoLabel();
+
+  // Deep-link support: ?y=2026&T=A&num=305 pre-fills the game-id builder and
+  // loads that game automatically on page load.
+  function applyUrlParams(){
+    const params = new URLSearchParams(window.location.search);
+    const y = params.get('y') || params.get('year');
+    const t = params.get('T') || params.get('t') || params.get('kind');
+    const n = params.get('num') || params.get('n') || params.get('number');
+    if(y) $('inYear').value = y;
+    if(t) $('inKind').value = t.toUpperCase();
+    if(n) $('inNum').value = n;
+    return !!(y || t || n);
+  }
+
+  // initial load
+  applyUrlParams();
+  fetchGame(true);
+})();
+</script>
+</body>
+</html>
